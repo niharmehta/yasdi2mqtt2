@@ -1,12 +1,11 @@
 name: yasdi2mqtt
-version: "20240814"
+version: "20260228"
 slug: yasdi2mqtt
 description: Yasdi2mqtt
 url: https://github.com/niharmehta/yasdi2mqtt
 arch:
 - armhf
 - armv7
-- armv8
 - aarch64
 - amd64
 - i386
@@ -16,9 +15,7 @@ ports:
   24273/tcp: 24273
   24272/udp: 24272
   24272/tcp: 24272
-panel_icon: mdi:solar-power
 boot: auto
-legacy: true
 stage: experimental
 ingress: false
 init: false
