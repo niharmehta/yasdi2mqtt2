@@ -1,11 +1,10 @@
 #include "mqtt_client.h"
+#include "log.h"
 
 #include <unistd.h>
 #include <string.h>
-#include <log.h>
 #include <MQTTClient.h>
 
-#define CLIENT_ID "yasdi2mqtt"
 #define MQTT_KEEP_ALIVE_INTERVAL 20
 #define MQTT_DISCONNECT_TIMEOUT 1000
 #define MQTT_RECONNECT_INTERVAL 10
@@ -23,7 +22,7 @@ bool mqtt_connect();
 void mqtt_conn_lost_cb(void *context, char *cause);
 int mqtt_msg_arrived_cb(void *context, char *topicName, int topicLen, MQTTClient_message *message);
 
-bool mqtt_init(char *server, uint16_t port, char *ssl_cert, char *user, char *password, char *topic_prefix, int qos_level)
+bool mqtt_init(char *server, uint16_t port, char *ssl_cert, char *user, char *password, char *topic_prefix, int qos_level, char *client_id)
 {
     int status;
     topic_pfx = topic_prefix;
@@ -31,7 +30,7 @@ bool mqtt_init(char *server, uint16_t port, char *ssl_cert, char *user, char *pa
 
     options = (MQTTClient_connectOptions)MQTTClient_connectOptions_initializer;
     options.keepAliveInterval = MQTT_KEEP_ALIVE_INTERVAL;
-    options.cleansession = false;
+    options.cleansession = true;
 
     if (user != NULL && password != NULL)
     {
@@ -58,7 +57,7 @@ bool mqtt_init(char *server, uint16_t port, char *ssl_cert, char *user, char *pa
     }
     sprintf(url, "%s://%s:%u", options.ssl ? "ssl" : "tcp", server, port);
 
-    status = MQTTClient_create(&client, url, CLIENT_ID, MQTTCLIENT_PERSISTENCE_NONE, NULL);
+    status = MQTTClient_create(&client, url, client_id, MQTTCLIENT_PERSISTENCE_NONE, NULL);
     if (status != MQTTCLIENT_SUCCESS)
     {
         log_fatal("Error while creating MQTTClient instance: %d", status);
@@ -89,27 +88,28 @@ bool mqtt_connect()
             log_info("Connection to mqtt broker established");
             return true;
         case 1:
-            log_warn("Connection refused while connecting to mqtt broker: Unacceptable protocol version");
-            return false;
+            log_warn("Connection refused: Unacceptable protocol version. Retrying in %d seconds...", MQTT_RECONNECT_INTERVAL);
+            break;
         case 2:
-            log_warn("Connection refused while connecting to mqtt broker: Identifier rejected");
-            return false;
+            log_warn("Connection refused: Identifier rejected. Retrying in %d seconds...", MQTT_RECONNECT_INTERVAL);
+            break;
         case 3:
-            // Continue connection attempts
-            log_warn("Connection refused while connecting to mqtt broker: Server unavailable");
+            log_warn("Connection refused: Server unavailable. Retrying in %d seconds...", MQTT_RECONNECT_INTERVAL);
             break;
         case 4:
-            log_warn("Connection refused while connecting to mqtt broker: Bad user name or password");
-            return false;
+            log_warn("Connection refused: Bad user name or password. Retrying in %d seconds...", MQTT_RECONNECT_INTERVAL);
+            break;
         case 5:
-            log_warn("Connection refused while connecting to mqtt broker: Not authorized");
-            return false;
+            log_warn("Connection refused: Not authorized. Retrying in %d seconds...", MQTT_RECONNECT_INTERVAL);
+            break;
         default:
-            log_warn("Unknown error while connecting to mqtt broker (status: %d). Going to retry in %d seconds...", status, MQTT_RECONNECT_INTERVAL);
+            log_warn("Unknown error while connecting to mqtt broker (status: %d). Retrying in %d seconds...", status, MQTT_RECONNECT_INTERVAL);
         }
 
         sleep(MQTT_RECONNECT_INTERVAL);
     } while (status != MQTTCLIENT_SUCCESS);
+
+    return false;
 }
 
 void mqtt_destroy()
